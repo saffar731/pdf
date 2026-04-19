@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud PDF Converter</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .container { background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); width: 100%; max-width: 450px; text-align: center; }
+        h1 { color: #1a73e8; margin-bottom: 20px; font-size: 24px; }
+        .drop-zone { border: 2px dashed #1a73e8; padding: 30px; border-radius: 8px; cursor: pointer; color: #5f6368; margin-bottom: 20px; transition: background 0.3s; }
+        .drop-zone:hover { background: #f8f9fa; }
+        .btn-group { display: grid; gap: 10px; }
+        button { background: #1a73e8; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 500; }
+        button:hover { background: #1557b0; }
+        button:disabled { background: #bdc1c6; cursor: not-allowed; }
+        #status { margin-top: 15px; font-size: 14px; color: #d93025; min-height: 20px; }
+        .loader { display: none; margin: 10px auto; border: 3px solid #f3f3f3; border-top: 3px solid #1a73e8; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>PDF Converter</h1>
+    <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+        <span id="fileLabel">Click to select PDF</span>
+        <input type="file" id="fileInput" hidden accept=".pdf" onchange="updateFileLabel()">
+    </div>
+
+    <div class="btn-group">
+        <button id="imgBtn" onclick="handleConvert('img')">Convert to Image</button>
+        <button id="xlsxBtn" onclick="handleConvert('xlsx')">Convert to Excel</button>
+        <button id="docxBtn" onclick="handleConvert('docx')">Convert to Word</button>
+    </div>
+
+    <div class="loader" id="loader"></div>
+    <div id="status"></div>
+</div>
+
+<script>
+    function updateFileLabel() {
+        const input = document.getElementById('fileInput');
+        document.getElementById('fileLabel').innerText = input.files[0] ? input.files[0].name : "Click to select PDF";
+        document.getElementById('status').innerText = "";
+    }
+
+    async function handleConvert(format) {
+        const input = document.getElementById('fileInput');
+        if (!input.files[0]) {
+            document.getElementById('status').innerText = "Please select a file!";
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+        formData.append('format', format);
+
+        setLoading(true);
+
+        try {
+            const response = await fetch('/convert', { method: 'POST', body: formData });
+            if (!response.ok) throw new Error(await response.text());
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `converted_file_${Date.now()}.${format === 'img' ? 'png' : format}`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            document.getElementById('status').style.color = "#188038";
+            document.getElementById('status').innerText = "Success!";
+        } catch (err) {
+            document.getElementById('status').style.color = "#d93025";
+            document.getElementById('status').innerText = "Error: " + err.message;
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function setLoading(isLoading) {
+        const buttons = document.querySelectorAll('button');
+        const loader = document.getElementById('loader');
+        loader.style.display = isLoading ? "block" : "none";
+        buttons.forEach(btn => btn.disabled = isLoading);
+    }
+</script>
+</body>
+</html>

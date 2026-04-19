@@ -1,0 +1,6 @@
+flask
+pymupdf
+pdfplumber
+pandas
+python-docx
+openpyxl
