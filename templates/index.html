@@ -3,35 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud PDF Converter</title>
+    <title>Ultimate PDF Converter</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .container { background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); width: 100%; max-width: 450px; text-align: center; }
-        h1 { color: #1a73e8; margin-bottom: 20px; font-size: 24px; }
-        .drop-zone { border: 2px dashed #1a73e8; padding: 30px; border-radius: 8px; cursor: pointer; color: #5f6368; margin-bottom: 20px; transition: background 0.3s; }
-        .drop-zone:hover { background: #f8f9fa; }
-        .btn-group { display: grid; gap: 10px; }
-        button { background: #1a73e8; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 500; }
-        button:hover { background: #1557b0; }
-        button:disabled { background: #bdc1c6; cursor: not-allowed; }
-        #status { margin-top: 15px; font-size: 14px; color: #d93025; min-height: 20px; }
-        .loader { display: none; margin: 10px auto; border: 3px solid #f3f3f3; border-top: 3px solid #1a73e8; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        h1 { color: #2c3e50; margin-bottom: 24px; }
+        .upload-box { border: 2px dashed #3498db; padding: 20px; border-radius: 10px; margin-bottom: 20px; background: #ebf5fb; cursor: pointer; }
+        .btn-stack { display: flex; flex-direction: column; gap: 10px; }
+        button { background: #3498db; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #2980b9; }
+        button:disabled { background: #bdc3c7; }
+        #status { margin-top: 20px; font-size: 14px; font-weight: bold; }
+        .loader { display: none; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 10px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="card">
     <h1>PDF Converter</h1>
-    <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
-        <span id="fileLabel">Click to select PDF</span>
-        <input type="file" id="fileInput" hidden accept=".pdf" onchange="updateFileLabel()">
+    <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+        <span id="fileName">Select PDF File</span>
+        <input type="file" id="fileInput" hidden accept=".pdf" onchange="updateName()">
     </div>
 
-    <div class="btn-group">
-        <button id="imgBtn" onclick="handleConvert('img')">Convert to Image</button>
-        <button id="xlsxBtn" onclick="handleConvert('xlsx')">Convert to Excel</button>
-        <button id="docxBtn" onclick="handleConvert('docx')">Convert to Word</button>
+    <div class="btn-stack">
+        <button onclick="process('img')">Save as PNG Image</button>
+        <button onclick="process('xlsx')">Save as Excel (XLSX)</button>
+        <button onclick="process('docx')">Save as Word (DOCX)</button>
     </div>
 
     <div class="loader" id="loader"></div>
@@ -39,52 +38,48 @@
 </div>
 
 <script>
-    function updateFileLabel() {
-        const input = document.getElementById('fileInput');
-        document.getElementById('fileLabel').innerText = input.files[0] ? input.files[0].name : "Click to select PDF";
-        document.getElementById('status').innerText = "";
+    function updateName() {
+        const file = document.getElementById('fileInput').files[0];
+        document.getElementById('fileName').innerText = file ? file.name : "Select PDF File";
     }
 
-    async function handleConvert(format) {
-        const input = document.getElementById('fileInput');
-        if (!input.files[0]) {
-            document.getElementById('status').innerText = "Please select a file!";
+    async function process(fmt) {
+        const fileInput = document.getElementById('fileInput');
+        const status = document.getElementById('status');
+        const loader = document.getElementById('loader');
+
+        if (!fileInput.files[0]) {
+            status.innerText = "⚠️ Please select a file first.";
+            status.style.color = "red";
             return;
         }
 
         const formData = new FormData();
-        formData.append('file', input.files[0]);
-        formData.append('format', format);
+        formData.append('file', fileInput.files[0]);
+        formData.append('format', fmt);
 
-        setLoading(true);
+        status.innerText = "Converting...";
+        status.style.color = "#3498db";
+        loader.style.display = "block";
 
         try {
-            const response = await fetch('/convert', { method: 'POST', body: formData });
-            if (!response.ok) throw new Error(await response.text());
+            const resp = await fetch('/convert', { method: 'POST', body: formData });
+            if (!resp.ok) throw new Error(await resp.text());
 
-            const blob = await response.blob();
+            const blob = await resp.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `converted_file_${Date.now()}.${format === 'img' ? 'png' : format}`;
-            document.body.appendChild(a);
+            a.download = `output_${Date.now()}.${fmt === 'img' ? 'png' : fmt}`;
             a.click();
-            a.remove();
-            document.getElementById('status').style.color = "#188038";
-            document.getElementById('status').innerText = "Success!";
-        } catch (err) {
-            document.getElementById('status').style.color = "#d93025";
-            document.getElementById('status').innerText = "Error: " + err.message;
+            status.innerText = "✅ Done!";
+            status.style.color = "green";
+        } catch (e) {
+            status.innerText = "❌ " + e.message;
+            status.style.color = "red";
         } finally {
-            setLoading(false);
+            loader.style.display = "none";
         }
-    }
-
-    function setLoading(isLoading) {
-        const buttons = document.querySelectorAll('button');
-        const loader = document.getElementById('loader');
-        loader.style.display = isLoading ? "block" : "none";
-        buttons.forEach(btn => btn.disabled = isLoading);
     }
 </script>
 </body>
