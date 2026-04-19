@@ -4,7 +4,6 @@ import pandas as pd
 from docx import Document
 import fitz  # PyMuPDF
 import io
-import os
 
 app = Flask(__name__, template_folder='../templates')
 
@@ -22,65 +21,58 @@ def convert():
     pdf_bytes = file.read()
 
     try:
-        # --- IMAGE CONVERSION (PNG) ---
+        # --- IMAGE CONVERSION ---
         if format_type == 'img':
             doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-            page = doc.load_page(0)  # Convert first page
-            pix = page.get_pixmap()
+            page = doc.load_page(0) 
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2)) # Higher resolution
             img_data = pix.tobytes("png")
-            
-            return send_file(
-                io.BytesIO(img_data),
-                mimetype='image/png',
-                as_attachment=True,
-                download_name='converted_page.png'
-            )
+            return send_file(io.BytesIO(img_data), mimetype='image/png', as_attachment=True, download_name='page_1.png')
 
-        # --- EXCEL CONVERSION (XLSX) ---
+        # --- EXCEL CONVERSION ---
         elif format_type == 'xlsx':
             output = io.BytesIO()
+            all_rows = []
             with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-                all_data = []
                 for page in pdf.pages:
+                    # Strategy 1: Look for explicit tables
                     table = page.extract_table()
                     if table:
-                        all_data.extend(table)
+                        all_rows.extend(table)
                     else:
+                        # Strategy 2: Fallback to lines of text
                         text = page.extract_text()
                         if text:
-                            all_data.append([text])
+                            for line in text.split('\n'):
+                                all_rows.append([line])
             
-            df = pd.DataFrame(all_data)
+            if not all_rows:
+                return "Could not extract data (PDF might be an image)", 400
+                
+            df = pd.DataFrame(all_rows)
             df.to_excel(output, index=False, header=False)
             output.seek(0)
-            return send_file(
-                output,
-                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                as_attachment=True,
-                download_name='converted_data.xlsx'
-            )
+            return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name='converted.xlsx')
 
-        # --- WORD CONVERSION (DOCX) ---
+        # --- WORD CONVERSION ---
         elif format_type == 'docx':
             output = io.BytesIO()
-            word_doc = Document()
+            doc = Document()
             with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
                 for page in pdf.pages:
                     text = page.extract_text()
                     if text:
-                        word_doc.add_paragraph(text)
+                        doc.add_paragraph(text)
             
-            word_doc.save(output)
+            if len(doc.paragraphs) == 0:
+                return "Could not extract text (PDF might be an image)", 400
+                
+            doc.save(output)
             output.seek(0)
-            return send_file(
-                output,
-                mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                as_attachment=True,
-                download_name='converted_text.docx'
-            )
+            return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document', as_attachment=True, download_name='converted.docx')
 
     except Exception as e:
-        return f"Error: {str(e)}", 500
+        return f"Server Error: {str(e)}", 500
 
-# Required for Vercel
+# For Vercel
 app.debug = False
